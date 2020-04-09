@@ -1,0 +1,714 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>utilities &#8212; Utilities_Import 2.0 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for utilities</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39;</span>
+
+<span class="sd">This Module provides some Function which are considered util. They are not necessary to run the code but ease it a lot.</span>
+
+<span class="sd">In total the following different Utilities classes are provided:</span>
+<span class="sd"> - Logger: this class initializes a logging instance which can be used to log all activities.</span>
+<span class="sd"> - Decorators: this class provides a set of different Decorators which can be used to add functionalities to functions</span>
+<span class="sd"> - ClassAttrHandler: this class provides some functionalities with respect to classes and their respective attributes.</span>
+<span class="sd"> - Dict_to_Obj: converts a dictionary to an object notation</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="k">import</span> <span class="n">isdir</span><span class="p">,</span> <span class="n">join</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="k">import</span> <span class="n">makedirs</span><span class="p">,</span> <span class="n">stat</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="k">import</span> <span class="n">stdout</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="k">import</span> <span class="n">random</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">shutil</span> <span class="k">import</span> <span class="n">rmtree</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">wraps</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Contains:</span>
+<span class="sd">- Logger</span>
+<span class="sd">- Decorator</span>
+<span class="sd">    - run_time</span>
+<span class="sd">    - show_args</span>
+<span class="sd">    - counter</span>
+<span class="sd">    - retry</span>
+<span class="sd">    - retry_with_exponential_stalling</span>
+<span class="sd">    - accepted_args</span>
+<span class="sd">    - accepted_args_classes</span>
+<span class="sd">    - accepted_args_type</span>
+<span class="sd">    - container_non_empty</span>
+<span class="sd">    - class_has_object</span>
+<span class="sd">- Dict_to_Obj</span>
+<span class="sd">- Class Attribute Handler</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<div class="viewcode-block" id="Logger"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Logger">[docs]</a><span class="k">class</span> <span class="nc">Logger</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class adds a logging instance which can be imported in other modules and used to track code and activities.</span>
+<span class="sd">    All logs to are written to stdout and also in a logging file. The logging file is identified via a timestamp and written into ./logs/</span>
+
+<span class="sd">    Usage: Import this class at the beginning of a module. You can then access the log attribute and use it as a logging instance</span>
+<span class="sd">    Example::</span>
+
+<span class="sd">    &gt; 1 from Utilities import Logger</span>
+<span class="sd">    &gt; 2 log = Logger.log</span>
+<span class="sd">    &gt; 3 log.info(&#39;Control is here&#39;)</span>
+<span class="sd">    &gt; # log prints &quot;Control is here&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">isdir</span><span class="p">(</span><span class="s2">&quot;logs&quot;</span><span class="p">):</span>
+        <span class="n">makedirs</span><span class="p">(</span><span class="s2">&quot;logs&quot;</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+        <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+        <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2">,</span><span class="si">%(msecs)d</span><span class="s2"> - file: </span><span class="si">%(module)s</span><span class="s2">  - func: </span><span class="si">%(funcName)s</span><span class="s2"> - line: </span><span class="si">%(lineno)d</span><span class="s2"> - </span><span class="si">%(levelname)s</span><span class="s2"> - msg: </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">datefmt</span><span class="o">=</span><span class="s2">&quot;%H:%M:%S&quot;</span><span class="p">,</span>
+        <span class="n">handlers</span><span class="o">=</span><span class="p">[</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span>
+                <span class="n">join</span><span class="p">(</span>
+                    <span class="s2">&quot;logs&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;log_</span><span class="si">{0}</span><span class="s2">_</span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="vm">__name__</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">gmtime</span><span class="p">())</span>
+                    <span class="p">),</span>
+                <span class="p">)</span>
+            <span class="p">),</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">(</span><span class="n">stdout</span><span class="p">),</span>
+        <span class="p">],</span>
+    <span class="p">)</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span></div>
+
+<span class="c1"># This module uses a logger itself</span>
+<span class="n">log</span> <span class="o">=</span> <span class="n">Logger</span><span class="o">.</span><span class="n">log</span>
+
+<div class="viewcode-block" id="Decorators"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators">[docs]</a><span class="k">class</span> <span class="nc">Decorators</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class provides a set of functionality with respect to decorate functions. These decorators are considered</span>
+<span class="sd">    util as they prevent to repeat the same code, add functionality to a function on the fly, allows a lot of type</span>
+<span class="sd">    and input checking and so on.</span>
+
+<span class="sd">    All the functions defined inside this class take a function as an input and return a decorated function.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Decorators.run_time"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.run_time">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">run_time</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        When decorating a function with this decorator, it indicates the function&#39;s run time in a hh:mm:ss after</span>
+<span class="sd">        the function returns.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; # Assume the function needs exactly 1 minute, 13.534 seconds to execute</span>
+<span class="sd">        &gt; @Decorators.run_time</span>
+<span class="sd">        &gt; 1 def foo(x):</span>
+<span class="sd">        &gt; 2   ...</span>
+<span class="sd">        &gt; ...</span>
+<span class="sd">        &gt; 7 foo(10)</span>
+<span class="sd">        &gt; #console prints &quot;00:01:13,534&quot;</span>
+
+<span class="sd">        :param func: function to decorate</span>
+<span class="sd">        :return: decorated function which indicates function run time</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">callable</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Wraps the original function and adds the decorator&#39;s run time display functionality</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">m</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">end</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="n">h</span><span class="p">,</span> <span class="n">m</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="n">ms</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">s</span> <span class="o">%</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
+            <span class="n">s</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;Execution Time (hh:mm:sec) for function &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot;: </span><span class="si">{h:02d}</span><span class="s1">:</span><span class="si">{m:02d}</span><span class="s1">:</span><span class="si">{s:02d}</span><span class="s1">,</span><span class="si">{ms:03d}</span><span class="s1">&#39;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">ret</span>
+
+        <span class="k">return</span> <span class="n">wrapper</span></div>
+
+<div class="viewcode-block" id="Decorators.show_args"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.show_args">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">show_args</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a function with this decorator, it indicates the arguments passed to the function.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; @Decorators.show_args</span>
+<span class="sd">        &gt; 1 def foo(x):</span>
+<span class="sd">        &gt;       ....</span>
+<span class="sd">        &gt;    10 foo(10)</span>
+<span class="sd">        &gt;    11 #console prints &quot;Executing &#39;foo&#39; with args 10 and &#39;&#39;&quot;</span>
+
+<span class="sd">        :param func: function to decorate</span>
+<span class="sd">        :return: decorated function which indicates function&#39;s arguments</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">assert</span> <span class="n">callable</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Executing &#39;</span><span class="si">{func.__name__}</span><span class="s2">&#39; with args </span><span class="si">{args}</span><span class="s2"> and </span><span class="si">{kwargs}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ret</span>
+        <span class="k">return</span> <span class="n">wrapper</span></div>
+
+<div class="viewcode-block" id="Decorators.counter"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.counter">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">counter</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a function with this decorator, it indicates how often the function has been called.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">         &gt;   @Decorators.counter</span>
+<span class="sd">         &gt;   1 def foo(x):</span>
+<span class="sd">         &gt;       ....</span>
+<span class="sd">         &gt;   10 foo(10)</span>
+<span class="sd">         &gt;   11 #console prints &quot;Executing &#39;foo&#39; with args 10 and &#39;&#39;&quot;</span>
+
+<span class="sd">        :param func: function to decorate</span>
+<span class="sd">        :return: decorated function which indicates how often the function has been called</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">assert</span> <span class="n">callable</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">wrapper</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="n">wrapper</span><span class="o">.</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Number of times &#39;</span><span class="si">{func.__name__}</span><span class="s2">&#39; has been called: </span><span class="si">{wrapper.count}</span><span class="s2">x&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">res</span>
+        <span class="n">wrapper</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">wrapper</span></div>
+
+<div class="viewcode-block" id="Decorators.retry"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.retry">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">retry</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">delay</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        When decorating a function with this decorator, it tries to execute the function. If the function returns successfully,</span>
+<span class="sd">        control is passed to the code right after the function. If however, a function fails to return successfully,</span>
+<span class="sd">        it is called once more until trying to successfully finishing it. This procedure is repeated until the functions</span>
+<span class="sd">        returns successfully or if it hits the number of limits of retries. Furthermore, the delay parameters adds</span>
+<span class="sd">        a sleeping time after each try.</span>
+
+<span class="sd">        Target: This decorator is useful for functions which performs requests from/to web applications. For instance, if a server</span>
+<span class="sd">        is temporarily unreachable, the request is requested in a fixed delay after the first failure.</span>
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; @Decorators.retry(5,20)</span>
+<span class="sd">        &gt; 1 def foo(x):</span>
+<span class="sd">        &gt;    ...</span>
+<span class="sd">        &gt; 7 foo(10)</span>
+<span class="sd">        &gt; # console prints: Trying to execute $foo</span>
+<span class="sd">        &gt; # upon failure: stalls 20 seconds and tries a next execution after stalling.</span>
+<span class="sd">        &gt; # after 5 tries, it raises an error</span>
+
+<span class="sd">        :param times: how many tries to execute the function</span>
+<span class="sd">        :type times: int</span>
+<span class="sd">        :param delay: waiting period between two function calls</span>
+<span class="sd">        :type delay: int</span>
+<span class="sd">        :return: a decorated function which tries to execute a specified times and sleeps during two failures. The sleeping amount is a function parameter</span>
+<span class="sd">        :rtype: func</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Wraps decorator arguments</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+
+            <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                Wraps the original function and adds the decorator&#39;s retry functionality</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="k">while</span> <span class="n">t</span> <span class="o">&lt;=</span> <span class="n">times</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Trying to execute &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot; (</span><span class="si">{t}</span><span class="s1">/</span><span class="si">{times}</span><span class="s1">)&#39;</span><span class="p">)</span>
+                        <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Successfully executed &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="n">res</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Execution failed for the following reason:&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                        <span class="n">t</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">if</span> <span class="n">t</span> <span class="o">&lt;=</span> <span class="n">times</span><span class="p">:</span>
+                            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                                <span class="n">f</span><span class="s1">&#39;Function &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot; could not be executed after </span><span class="si">{times}</span><span class="s1"> tries&#39;</span>
+                            <span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">wrapper</span>
+
+        <span class="k">return</span> <span class="n">decorator</span></div>
+
+<div class="viewcode-block" id="Decorators.retry_with_exponential_stalling"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.retry_with_exponential_stalling">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">retry_with_exponential_stalling</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">white_noise</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        When decorating a function with this decorator, it tries to execute the function. If the function returns successfully,</span>
+<span class="sd">        control is passed to the code right after the function. If however, a function fails to return successfully,</span>
+<span class="sd">        it is called once more until trying to successfully finishing it. This procedure is repeated until the functions</span>
+<span class="sd">        returns successfully or if it hits the number of limits of retries.</span>
+<span class="sd">        After each failure of a function, it is stalled (sleeping). The amount of stalling doubles after each unsuccessful try</span>
+<span class="sd">        which implements and exponential stalling time.</span>
+
+<span class="sd">        Target: This decorator is useful for functions which performs requests from the Internet. For instance, if a server</span>
+<span class="sd">        is temporarily unreachable, the request is requested in a fixed delay after the first failure.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; @Decorators.retry_with_exponential_stalling(5)</span>
+<span class="sd">        &gt; 1 def foo(x):</span>
+<span class="sd">        &gt;    ...</span>
+<span class="sd">        &gt; 7 foo(10)</span>
+<span class="sd">        &gt; # console prints: Trying to execute $foo</span>
+<span class="sd">        &gt; # upon failure: stalls a multiple of 2 seconds and tries a next execution after stalling.</span>
+<span class="sd">        &gt; # after 5 tries, it raises an error</span>
+
+<span class="sd">        :param times: how many tries to execute the function</span>
+<span class="sd">        :type times: int</span>
+<span class="sd">        :param white_noise: if set to True it adds some random values to the stalling period</span>
+<span class="sd">        :type white_noise: bool</span>
+<span class="sd">        :return: a decorated function which tries to execute a specified times and sleeps during two failures. The sleeping time increases exponentially</span>
+<span class="sd">        :rtype: func</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Wraps decorator arguments</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+
+            <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                Wraps the original function and adds the decorator&#39;s retry with exponential stalling functionality</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+                <span class="n">t</span><span class="p">,</span> <span class="n">delay</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">white_noise</span> <span class="k">else</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">random</span><span class="p">()</span>
+                <span class="k">while</span> <span class="n">t</span> <span class="o">&lt;=</span> <span class="n">times</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Trying to execute &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot; (</span><span class="si">{t}</span><span class="s1">/</span><span class="si">{times}</span><span class="s1">)&#39;</span><span class="p">)</span>
+                        <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Successfully executed &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="n">res</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Execution failed for the following reason:&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                        <span class="n">t</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">if</span> <span class="n">t</span> <span class="o">&lt;=</span> <span class="n">times</span><span class="p">:</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                                <span class="n">f</span><span class="s2">&quot;Stalling {round(delay, 3)} secs before next execution try.&quot;</span>
+                            <span class="p">)</span>
+                            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">delay</span><span class="p">)</span>
+                            <span class="n">delay</span> <span class="o">*=</span> <span class="mi">2</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                                <span class="n">f</span><span class="s1">&#39;Function &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot; could not be executed after </span><span class="si">{times}</span><span class="s1"> tries&#39;</span>
+                            <span class="p">)</span>
+                            <span class="k">raise</span> <span class="n">FunctionNotExecutedError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Function &quot;</span><span class="si">{func.__name__}</span><span class="s1">&quot; could not be executed after </span><span class="si">{times}</span><span class="s1"> tries for the following reason: </span><span class="si">{e}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">wrapper</span>
+
+        <span class="k">return</span> <span class="n">decorator</span></div>
+
+<div class="viewcode-block" id="Decorators.accepted_arguments"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.accepted_arguments">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">accepted_arguments</span><span class="p">(</span><span class="n">accepted_args</span><span class="p">:</span><span class="nb">list</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a function with this decorator, the function&#39;s arguments are checked against a list of valid arguments.</span>
+<span class="sd">        If an invalid argument is encoutered, the function is not executed.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; @Decorators.accepted_arguments([0,1])</span>
+<span class="sd">        &gt; 1 def foo(x):</span>
+<span class="sd">        &gt;    ...</span>
+<span class="sd">        &gt; 7 foo(10)</span>
+<span class="sd">        &gt; # console prints: Encountered a non-valid argument.</span>
+<span class="sd">        &gt; # console prints: Valid arguments are: [0,1]</span>
+
+<span class="sd">        :param accepted_args: list of accepted arguments by the function</span>
+<span class="sd">        :type accepted_args: list</span>
+<span class="sd">        :return: a decorated function which checks the aguments</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="nb">all</span><span class="p">([</span><span class="n">a</span> <span class="ow">in</span> <span class="n">accepted_args</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="p">])</span>
+                <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Encountered a non-valid argument.</span><span class="se">\n</span><span class="s1">Valid arguments are: </span><span class="si">{accepted_args}</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">result</span>
+            <span class="k">return</span> <span class="n">wrapper</span>
+        <span class="k">return</span> <span class="n">decorator</span></div>
+
+<div class="viewcode-block" id="Decorators.accepted_arguments_within_class_methods"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.accepted_arguments_within_class_methods">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">accepted_arguments_within_class_methods</span><span class="p">(</span><span class="n">accepted_args</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a function with this decorator, the function&#39;s arguments are checked against a list of valid arguments.</span>
+<span class="sd">        If an invalid argument is encountered, the function is not executed. This decorator is basically the same as &quot;accepted_arguments&quot;</span>
+<span class="sd">        decorator except that it is aimed for functions within classes (i.e. containing a &quot;self&quot; parameter). In these setup, the class instance</span>
+<span class="sd">        itself is passed as the first argument. Therefore, this Decorator only checks the second till last argument for correctness.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; 1 class Foo:</span>
+<span class="sd">        &gt; 2   ...</span>
+<span class="sd">        &gt; ...</span>
+<span class="sd">        &gt; 10   @Decorators.accepted_arguments_within_class_methods([0,1])</span>
+<span class="sd">        &gt; 11   def bar(self):</span>
+<span class="sd">        &gt; 12         ...</span>
+<span class="sd">        &gt; ...</span>
+<span class="sd">        &gt; 18 foo=Foo(1)</span>
+<span class="sd">        &gt; 19 foo.bar()</span>
+<span class="sd">        &gt; # console prints: Encountered a non-valid argument.</span>
+<span class="sd">        &gt; # console prints: Valid arguments are: [0,1]</span>
+
+<span class="sd">        :param accepted_args: list of accepted arguments by the function</span>
+<span class="sd">        :type accepted_args: list</span>
+<span class="sd">        :return: a decorated function which checks the aguments</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="nb">all</span><span class="p">([</span><span class="n">a</span> <span class="ow">in</span> <span class="n">accepted_args</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+                <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Encountered a non-valid argument.</span><span class="se">\n</span><span class="s1">Valid arguments are: </span><span class="si">{accepted_args}</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">result</span>
+            <span class="k">return</span> <span class="n">wrapper</span>
+        <span class="k">return</span> <span class="n">decorator</span></div>
+
+<div class="viewcode-block" id="Decorators.accepted_argument_types"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.accepted_argument_types">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">accepted_argument_types</span><span class="p">(</span><span class="o">*</span><span class="n">decorator_args</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a function with this decorator, the function&#39;s arguments types are checked against a list of valid types.</span>
+<span class="sd">        The types are provided in the same order as the corresponding arguments such that they match.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; @Decorators.accepted_argument_types(str,str)</span>
+<span class="sd">        &gt; 1 def foo(x,y):</span>
+<span class="sd">        &gt;    ...</span>
+<span class="sd">        &gt; 7 foo(10,5)</span>
+<span class="sd">        &gt; # console prints: Argument Types do not match expected types.</span>
+<span class="sd">        &gt; # console prints: Expected str, str but got int, int</span>
+
+<span class="sd">        :param decorator_args:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">check_args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">decorator_args</span><span class="p">,</span> <span class="n">args</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">argument_types</span><span class="p">,</span> <span class="n">arguments</span> <span class="ow">in</span> <span class="n">check_args</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arguments</span><span class="p">,</span> <span class="n">argument_types</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Argument Types do not match expected types.</span><span class="se">\n</span><span class="s1">Expected {type(arguments)} but got </span><span class="si">{argument_types}</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">result</span>
+            <span class="k">return</span> <span class="n">wrapper</span>
+        <span class="k">return</span> <span class="n">decorator</span></div>
+
+<div class="viewcode-block" id="Decorators.class_object_has_attr"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.class_object_has_attr">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">class_object_has_attr</span><span class="p">(</span><span class="n">attribute</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a class method with this function, it checks if the class instance has a given attribute.</span>
+<span class="sd">        It allows chaining to get deep levels of attributes. Note that this decorator can only be used by class methods.</span>
+
+<span class="sd">        :param attribute:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="n">has_deep_attr</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">attribute</span><span class="p">)</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">result</span>
+                <span class="k">except</span> <span class="ne">AssertionError</span><span class="p">:</span>
+                    <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;The object &#39;</span><span class="si">{object}</span><span class="s2">&#39; does not have the required attribute </span><span class="si">{attribute}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">wrapper</span>
+        <span class="k">return</span> <span class="n">decorator</span></div>
+
+<div class="viewcode-block" id="Decorators.container_non_empty"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators.container_non_empty">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">container_non_empty</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        When decorating a function with this decorator, the function checks if the object is not empy.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">        &gt; @Decorators.container_non_empty</span>
+<span class="sd">        &gt; 1 def foo(x):</span>
+<span class="sd">        &gt;    ...</span>
+<span class="sd">        &gt; 7 foo(&#39;&#39;)</span>
+<span class="sd">        &gt; # console prints: Container &#39;&#39; is empty</span>
+
+<span class="sd">        :param decorator_args:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">argument</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_is_container</span><span class="p">(</span><span class="n">argument</span><span class="p">):</span>
+                    <span class="bp">cls</span><span class="o">.</span><span class="n">_check_if_empty_container</span><span class="p">(</span><span class="n">argument</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result</span>
+
+        <span class="k">return</span> <span class="n">wrapper</span></div>
+
+<div class="viewcode-block" id="Decorators._is_container"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators._is_container">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_is_container</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Indicates, if an object is a container by checking if is has the __iter__ attribute</span>
+
+<span class="sd">        :param obj: an object whose type is tested</span>
+<span class="sd">        :return: True if it is a container object</span>
+<span class="sd">        :rtype: bool</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">hasattr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">),</span> <span class="s1">&#39;__iter__&#39;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Decorators._check_if_empty_container"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Decorators._check_if_empty_container">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_check_if_empty_container</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if the function&#39;s argument is a container object.</span>
+<span class="sd">        It currently only works for list, dict, str, tuple and set object. Further object types can be added by time.</span>
+
+<span class="sd">        :param obj: an object, whose size is tested</span>
+<span class="sd">        :return: None</span>
+<span class="sd">        :raises IndexError if the container is empty</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">obj_type</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="n">cond</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="nb">list</span><span class="p">:</span> <span class="nb">len</span><span class="p">,</span>
+            <span class="nb">dict</span><span class="p">:</span> <span class="nb">len</span><span class="p">,</span>
+            <span class="nb">str</span><span class="p">:</span> <span class="nb">len</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">:</span> <span class="nb">len</span><span class="p">,</span>
+            <span class="nb">set</span><span class="p">:</span> <span class="nb">len</span><span class="p">,</span>
+            <span class="c1"># np.ndarray : np.size,</span>
+            <span class="c1"># pd.core.frame.DataFrame : len, #or pd.core.frame.DataFrame.empty</span>
+        <span class="p">}</span>
+        <span class="n">func</span> <span class="o">=</span> <span class="n">cond</span><span class="p">[</span><span class="n">obj_type</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">func</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Container </span><span class="si">{obj}</span><span class="s1"> is empty&#39;</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="Dict_to_Obj"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Dict_to_Obj">[docs]</a><span class="k">class</span> <span class="nc">Dict_to_Obj</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    This class constructs an object notation out of a dictionary.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+<div class="viewcode-block" id="Dict_to_Obj.__init__"><a class="viewcode-back" href="../Utilities_Import.html#utilities.Dict_to_Obj.__init__">[docs]</a>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+               <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="p">[</span><span class="n">obj</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">b</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+               <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">obj</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">b</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="ClassAttrHandler"><a class="viewcode-back" href="../Utilities_Import.html#utilities.ClassAttrHandler">[docs]</a><span class="k">class</span> <span class="nc">ClassAttrHandler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    This class provides some functionalities with respect to class instance attributes.</span>
+<span class="sd">    Additional functionalities allow iterating over the object, transform all container attributes to their corresponding</span>
+<span class="sd">    size, deleting empty attributes and getting a list of strings containg all attributes label or attribute values.</span>
+<span class="sd">    Usage: costume classes can inherit from this class in order to have additional functionalities with respect to attributes.</span>
+
+<span class="sd">    Example::</span>
+
+
+<span class="sd">    &gt; 1 class Myclass(ClassattrHandler):</span>
+<span class="sd">    &gt; 2   def __init__(self,attribute_1, attribute_2):</span>
+<span class="sd">    &gt; 3       self.attribute_1 = attribute_1</span>
+<span class="sd">    &gt; 4       self.attribute_2 = attribute_2</span>
+<span class="sd">    &gt; 5       ...</span>
+<span class="sd">    &gt; 6</span>
+<span class="sd">    &gt; 7   def foo(self):</span>
+<span class="sd">    &gt; 8       for attr_label, attr_value in self:</span>
+<span class="sd">    &gt; 9           ....</span>
+<span class="sd">    &gt; 10  def print_attr_labels(self):</span>
+<span class="sd">    &gt; 11      print(self.attributes_labels)</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Enables class attributes to be iterated over. Simply let the target class this class.</span>
+<span class="sd">        Class attributes can then be iterated over by using a for loop.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            def Myclass(ClassattrHandler):</span>
+<span class="sd">                def __init__(....</span>
+
+<span class="sd">                def iterage_over_attibutes(self):</span>
+<span class="sd">                    for attr, value in self:</span>
+<span class="sd">                        ...</span>
+
+<span class="sd">        In this Example, the class &quot;Myclass&quot; inherits the ClassAttrHandler which therefore allows it to iterate over its attributes.</span>
+<span class="sd">        This is achieved via a &quot;for ... in self&quot; loop which yields the attributes and the corresponding value</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span>
+
+<div class="viewcode-block" id="ClassAttrHandler._return_container_size"><a class="viewcode-back" href="../Utilities_Import.html#utilities.ClassAttrHandler._return_container_size">[docs]</a>    <span class="k">def</span> <span class="nf">_return_container_size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Transforms all class instances attributes of container type into its corresponding length.</span>
+
+<span class="sd">        :return: all attributes represent their length value</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">Decorators</span><span class="o">.</span><span class="n">_is_container</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="s1">&#39;No Container attribute&#39;</span></div>
+
+<div class="viewcode-block" id="ClassAttrHandler._delete_empty_attributes"><a class="viewcode-back" href="../Utilities_Import.html#utilities.ClassAttrHandler._delete_empty_attributes">[docs]</a>    <span class="k">def</span> <span class="nf">_delete_empty_attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Drop all attributes which are empty from the instance.</span>
+
+<span class="sd">        :return: the same object which no longer has any empty attribute</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">attrs_to_delete</span> <span class="o">=</span> <span class="p">[</span><span class="n">val</span> <span class="k">for</span> <span class="n">val</span><span class="p">,</span><span class="n">attr</span> <span class="ow">in</span> <span class="bp">self</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">attr</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">attrs_to_delete</span><span class="p">:</span>
+            <span class="nb">delattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">attr</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">attributes_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr_type</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Returns a list of an object&#39;s attributes labels. If provided with attr_type, only attributes labels of a certain type are written into the list</span>
+
+<span class="sd">        :param attr_type: Optional argument to restrict the attribute list to attributes of the given type.</span>
+<span class="sd">        :return: a list of strings containing all attributes labels</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">attr_label</span> <span class="k">for</span> <span class="n">attr_label</span><span class="p">,</span> <span class="n">attr_val</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">]</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">attr_type</span> <span class="k">else</span> <span class="p">[</span><span class="n">attr_label</span> <span class="k">for</span> <span class="n">attr_label</span><span class="p">,</span> <span class="n">attr_val</span>
+                                                                                    <span class="ow">in</span> <span class="bp">self</span> <span class="k">if</span>
+                                                                                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">attr_val</span><span class="p">,</span> <span class="n">attr_type</span><span class="p">)]</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">attributes_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr_type</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        Returns a list of an object&#39;s attributes values. If provided with attr_type, only attributes values of a certain type are written into the list</span>
+
+<span class="sd">        :param attr_type: Optional argument to restrict the attribute list to attributes of the given type.</span>
+<span class="sd">        :return: a list of strings containing all attributes values</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">attr_val</span> <span class="k">for</span> <span class="n">attr_label</span><span class="p">,</span> <span class="n">attr_val</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">]</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">attr_type</span> <span class="k">else</span> <span class="p">[</span><span class="n">attr_val</span> <span class="k">for</span> <span class="n">attr_label</span><span class="p">,</span> <span class="n">attr_val</span> <span class="ow">in</span>
+                                                                                  <span class="bp">self</span> <span class="k">if</span>
+                                                                                  <span class="nb">isinstance</span><span class="p">(</span><span class="n">attr_val</span><span class="p">,</span> <span class="n">attr_type</span><span class="p">)]</span>
+<div class="viewcode-block" id="ClassAttrHandler.get_deep_attr"><a class="viewcode-back" href="../Utilities_Import.html#utilities.ClassAttrHandler.get_deep_attr">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_deep_attr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attrs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        This function is a helper function which allows attributes checking for nested/composed attributes.</span>
+
+<span class="sd">        :param obj:</span>
+<span class="sd">        :param attrs:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">attrs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">):</span>
+            <span class="n">obj</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+
+<div class="viewcode-block" id="ClassAttrHandler.has_deep_attr"><a class="viewcode-back" href="../Utilities_Import.html#utilities.ClassAttrHandler.has_deep_attr">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">has_deep_attr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attrs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        This function is a helper function which allows attributes checking for nested/composed attributes.</span>
+
+<span class="sd">        :param obj:</span>
+<span class="sd">        :param attrs:</span>
+<span class="sd">        :return:</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">get_deep_attr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attrs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../Utilities_Import.html">Utilities_Import</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../Utilities_Import.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Dominik Heinz.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
