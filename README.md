@@ -21,9 +21,13 @@ The src file can be imported and used for other projects.
 # Prerequisits
 The source code is written in [Python 3.8](https://www.python.org/). It use some of the standard libraries which are included in the most Python environments.
 Those standard libraries are:
-    - pathlib
-    - os 
-    - operator
+
+    - os
+    - logging
+    - sys
+    - random
+    - time
+    - functools
 
 # Installation
 You can clone this repository by running:
