@@ -421,7 +421,7 @@ class Decorators:
         return decorator
 
     @classmethod
-        def container_non_empty(cls, func):
+    def container_non_empty(cls, func):
         '''
         When decorating a function with this decorator, the function checks if the object is not empy.
 
