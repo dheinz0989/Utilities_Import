@@ -28,13 +28,17 @@ Those standard libraries are:
 # Installation
 You can clone this repository by running:
 	
-	git clone https://github.com/dheinz0989/FileSizeDistributor_for_Multiprocessing
+	git clone https://github.com/dheinz0989/Utilities_Import
 
 # Example usage
-an example usage can be found here. It imports most of the modules features and includes them in a test script. 
+an example usage can be found in the [test](https://github.com/dheinz0989/Utilities_Import/tree/master/test). It imports most of the modules features and includes them in a test script. 
+You can run it via:
 
+```
+python example.py
+```
 # Documentation
-More details with regards to the function and for which use case they are intended to be used can be found in the docs. 
+More details with regards to the function and for which use case they are intended to be used can be found in the [docs](https://github.com/dheinz0989/Utilities_Import/blob/master/docs/build/html/Utilities_Import.html). 
 
 # To Do
 This repository has several things which are not implemented yet. Amongs others, the following implementation are planned:
