@@ -35,42 +35,7 @@ Contains:
 - Class Attribute Handler
 '''
 
-class Logger:
-    """
-    This class adds a logging instance which can be imported in other modules and used to track code and activities.
-    All logs to are written to stdout and also in a logging file. The logging file is identified via a timestamp and written into ./logs/
 
-    Usage: Import this class at the beginning of a module. You can then access the log attribute and use it as a logging instance
-    Example::
-
-    > 1 from Utilities import Logger
-    > 2 log = Logger.log
-    > 3 log.info('Control is here')
-    > # log prints "Control is here"
-    """
-
-    if not isdir("logs"):
-        makedirs("logs")
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s,%(msecs)d - file: %(module)s  - func: %(funcName)s - line: %(lineno)d - %(levelname)s - msg: %(message)s",
-        datefmt="%H:%M:%S",
-        handlers=[
-            logging.FileHandler(
-                join(
-                    "logs",
-                    "log_{0}_{1}".format(
-                        __name__, time.strftime("%Y-%m-%d", time.gmtime())
-                    ),
-                )
-            ),
-            logging.StreamHandler(stdout),
-        ],
-    )
-    log = logging.getLogger(__name__)
-
-# This module uses a logger itself
-log = Logger.log
 
 class Decorators:
     """
@@ -608,3 +573,160 @@ class ClassAttrHandler(object):
             return True
         except AttributeError:
             return False
+
+
+def get_date_time(with_time=True) -> str:
+    """
+    Returns the current date in an date_time format
+    """
+    return datetime.now().strftime("%Y-%m-%d_%H-%M") if with_time else datetime.now().strftime("%Y-%m-%d")
+
+# NEW LOGGER
+
+class Logger:
+    """
+    This class adds a logging instance which can be imported in other modules and used to track code and activities.
+    It consists of a single function and is only embedded in a class for giving a namespace that clarifies that is is a logging instance.
+    All logs to are written to stdout. Furthermore, logs can optionally be written to a logging file
+    The logging file is identified via a timestamp and written into ./logs/
+
+    Usage: Import this class at the beginning of a module. You can then access the log attribute and use it as a logging instance
+    Example::
+
+    > 1 from Utilities import Logger
+    > 2 log = Logger.log()
+    > 3 log.info('Control is here')
+    > # log prints "Control is here"
+    """
+
+    def add_coloring_to_emit_windows(fn):
+        def _out_handle(self):
+            import ctypes
+            return ctypes.windll.kernel32.GetStdHandle(self.STD_OUTPUT_HANDLE)
+        out_handle = property(_out_handle)
+
+        def _set_color(self, code):
+            import ctypes
+            # Constants from the Windows API
+            self.STD_OUTPUT_HANDLE = -11
+            hdl = ctypes.windll.kernel32.GetStdHandle(self.STD_OUTPUT_HANDLE)
+            ctypes.windll.kernel32.SetConsoleTextAttribute(hdl, code)
+        setattr(logging.StreamHandler, '_set_color', _set_color)
+
+        def new(*args):
+            FOREGROUND_BLUE = 0x0001  # text color contains blue.
+            FOREGROUND_GREEN = 0x0002  # text color contains green.
+            FOREGROUND_RED = 0x0004  # text color contains red.
+            FOREGROUND_INTENSITY = 0x0008  # text color is intensified.
+            FOREGROUND_WHITE = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED
+            # winbase.h
+            STD_INPUT_HANDLE = -10
+            STD_OUTPUT_HANDLE = -11
+            STD_ERROR_HANDLE = -12
+
+            # wincon.h
+            FOREGROUND_BLACK = 0x0000
+            FOREGROUND_BLUE = 0x0001
+            FOREGROUND_GREEN = 0x0002
+            FOREGROUND_CYAN = 0x0003
+            FOREGROUND_RED = 0x0004
+            FOREGROUND_MAGENTA = 0x0005
+            FOREGROUND_YELLOW = 0x0006
+            FOREGROUND_GREY = 0x0007
+            FOREGROUND_INTENSITY = 0x0008  # foreground color is intensified.
+
+            BACKGROUND_BLACK = 0x0000
+            BACKGROUND_BLUE = 0x0010
+            BACKGROUND_GREEN = 0x0020
+            BACKGROUND_CYAN = 0x0030
+            BACKGROUND_RED = 0x0040
+            BACKGROUND_MAGENTA = 0x0050
+            BACKGROUND_YELLOW = 0x0060
+            BACKGROUND_GREY = 0x0070
+            BACKGROUND_INTENSITY = 0x0080  # background color is intensified.
+
+            levelno = args[1].levelno
+            if (levelno >= 50):
+                color = BACKGROUND_YELLOW | FOREGROUND_RED | FOREGROUND_INTENSITY | BACKGROUND_INTENSITY
+            elif (levelno >= 40):
+                color = FOREGROUND_RED | FOREGROUND_INTENSITY
+            elif (levelno >= 30):
+                color = FOREGROUND_YELLOW | FOREGROUND_INTENSITY
+            elif (levelno >= 20):
+                color = FOREGROUND_GREEN
+            elif (levelno >= 10):
+                color = FOREGROUND_MAGENTA
+            else:
+                color = FOREGROUND_WHITE
+            args[0]._set_color(color)
+
+            ret = fn(*args)
+            args[0]._set_color(FOREGROUND_WHITE)
+            return ret
+
+        return new
+
+
+    def add_coloring_to_emit_ansi(fn):
+        # add methods we need to the class
+        def new(*args):
+            levelno = args[1].levelno
+            if (levelno >= 50):
+                color = '\x1b[31m'  # red
+            elif (levelno >= 40):
+                color = '\x1b[31m'  # red
+            elif (levelno >= 30):
+                color = '\x1b[33m'  # yellow
+            elif (levelno >= 20):
+                color = '\x1b[32m'  # green
+            elif (levelno >= 10):
+                color = '\x1b[35m'  # pink
+            else:
+                color = '\x1b[0m'  # normal
+            args[1].msg = color + args[1].msg + '\x1b[0m'  # normal
+            # print "after"
+            return fn(*args)
+
+        return new
+
+    @classmethod
+    def colored_output(cls):
+        import platform
+        if platform.system() == 'Windows':
+            # Windows does not support ANSI escapes and we are using API calls to set the console color
+            logging.StreamHandler.emit = cls.add_coloring_to_emit_windows(logging.StreamHandler.emit)
+        else:
+            # all non-Windows platforms are supporting ANSI escapes so we use them
+            logging.StreamHandler.emit = cls.add_coloring_to_emit_ansi(logging.StreamHandler.emit)
+
+    @classmethod
+    def initialize_log(cls,write_to_file=False, coloured_output = False):
+        """
+        Initializes a logging instance that writes to stout. It can optionally also write to a logging file
+
+        :param write_to_file: indicates, if a subdirectory with "logs" is  created in which a logging file is written into
+        :type write_to_file: bool
+        :return:
+        """
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s,%(msecs)d - file: %(module)s  - func: %(funcName)s - line: %(lineno)d - %(levelname)s - msg: %(message)s",datefmt="%H:%M:%S")
+        console_output = logging.StreamHandler(sys.stdout)
+        console_output.setFormatter(formatter)
+        if logger.hasHandlers():
+            logger.handlers.clear()
+        logger.addHandler(console_output)
+        if write_to_file:
+            Path('logs').mkdir(parents=True, exist_ok=True)
+            log_file_name = f'log_{__name__}_{get_date_time()}.log'
+            file_output = logging.FileHandler(Path('logs').joinpath(log_file_name))
+            file_output.setFormatter(formatter)
+            print(file_output)
+            logger.addHandler(file_output)
+        if coloured_output:
+            cls.colored_output()
+        return logger
+
+
+log = Logger.initialize_log()
+
